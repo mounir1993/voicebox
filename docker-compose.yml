@@ -29,7 +29,7 @@ services:
       resources:
         limits:
           cpus: '4'
-          memory: 8G
+          memory: 12G
 
 networks:
   voicebox-net:
