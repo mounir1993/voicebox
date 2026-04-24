@@ -255,13 +255,10 @@ def _register_lifecycle(application: FastAPI) -> None:
             logger.warning("Could not initialize progress manager event loop: %s", e)
 
         try:
-            from huggingface_hub import constants as hf_constants
-
-            cache_dir = Path(hf_constants.HF_HUB_CACHE)
-            cache_dir.mkdir(parents=True, exist_ok=True)
+            cache_dir = config.ensure_hf_cache_writable()
             logger.info("Model cache: %s", cache_dir)
         except Exception as e:
-            logger.warning("Could not create HuggingFace cache directory: %s", e)
+            logger.warning("Could not initialize writable HuggingFace cache directory: %s", e)
 
         logger.info("Ready")
 

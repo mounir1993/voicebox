@@ -6,20 +6,104 @@ Handles data directory configuration for production bundling.
 
 import logging
 import os
+import tempfile
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# Default data directory (used in development)
+_data_dir = Path("data").resolve()
+
+
+def _sync_hf_constants(cache_dir: Path) -> None:
+    """Keep huggingface_hub constants aligned with runtime env overrides."""
+    try:
+        from huggingface_hub import constants as hf_constants
+
+        cache_str = str(cache_dir)
+        os.environ["HF_HUB_CACHE"] = cache_str
+        os.environ["HUGGINGFACE_HUB_CACHE"] = cache_str
+        os.environ["TRANSFORMERS_CACHE"] = cache_str
+        hf_constants.HF_HUB_CACHE = cache_str
+        hf_constants.HUGGINGFACE_HUB_CACHE = cache_str
+    except Exception:
+        # huggingface_hub may not be imported yet; env vars are still set above.
+        pass
+
+
+def set_models_cache_dir(path: str | Path) -> Path:
+    """Set and create the HuggingFace cache directory used by all engines."""
+    cache_dir = Path(path).expanduser().resolve()
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    cache_str = str(cache_dir)
+    os.environ["HF_HUB_CACHE"] = cache_str
+    os.environ["HUGGINGFACE_HUB_CACHE"] = cache_str
+    os.environ["TRANSFORMERS_CACHE"] = cache_str
+    _sync_hf_constants(cache_dir)
+    logger.info("Model cache directory set to: %s", cache_dir)
+    return cache_dir
+
+
+def _is_dir_writable(path: Path) -> bool:
+    """Return True if path exists (or can be created) and is writable."""
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".voicebox_hf_probe"
+        probe.write_text("ok")
+        probe.unlink(missing_ok=True)
+        return True
+    except Exception:
+        return False
+
+
+def _get_current_hf_cache_dir() -> Path:
+    """Resolve the active HF cache directory from env/constants/defaults."""
+    env_cache = os.environ.get("HF_HUB_CACHE") or os.environ.get("HUGGINGFACE_HUB_CACHE")
+    if env_cache:
+        return Path(env_cache).expanduser().resolve()
+
+    try:
+        from huggingface_hub import constants as hf_constants
+
+        return Path(hf_constants.HF_HUB_CACHE).expanduser().resolve()
+    except Exception:
+        return (Path.home() / ".cache" / "huggingface" / "hub").resolve()
+
+
+def ensure_hf_cache_writable() -> Path:
+    """Ensure HF cache path is writable, with safe fallback for constrained runtimes."""
+    current_cache = _get_current_hf_cache_dir()
+    if _is_dir_writable(current_cache):
+        _sync_hf_constants(current_cache)
+        return current_cache
+
+    candidates = [
+        get_cache_dir() / "huggingface" / "hub",
+        Path(tempfile.gettempdir()) / "voicebox" / "huggingface" / "hub",
+    ]
+
+    for candidate in candidates:
+        if _is_dir_writable(candidate):
+            logger.warning(
+                "HF cache directory is not writable (%s). Falling back to %s",
+                current_cache,
+                candidate,
+            )
+            return set_models_cache_dir(candidate)
+
+    raise PermissionError(
+        "Unable to find a writable HuggingFace cache directory. "
+        f"Checked: {current_cache}, {', '.join(str(c) for c in candidates)}"
+    )
+
 
 # Allow users to override the HuggingFace model download directory.
 # Set VOICEBOX_MODELS_DIR to an absolute path before starting the server.
 # This sets HF_HUB_CACHE so all huggingface_hub downloads go to that path.
 _custom_models_dir = os.environ.get("VOICEBOX_MODELS_DIR")
 if _custom_models_dir:
-    os.environ["HF_HUB_CACHE"] = _custom_models_dir
-    logger.info("Model download path set to: %s", _custom_models_dir)
-
-# Default data directory (used in development)
-_data_dir = Path("data").resolve()
+    set_models_cache_dir(_custom_models_dir)
 
 
 def _path_relative_to_any_data_dir(path: Path) -> Path | None:
