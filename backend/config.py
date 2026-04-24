@@ -21,11 +21,18 @@ def _sync_hf_constants(cache_dir: Path) -> None:
         from huggingface_hub import constants as hf_constants
 
         cache_str = str(cache_dir)
+        hf_home = cache_dir.parent
+        xet_cache = hf_home / "xet"
+
         os.environ["HF_HUB_CACHE"] = cache_str
         os.environ["HUGGINGFACE_HUB_CACHE"] = cache_str
         os.environ["TRANSFORMERS_CACHE"] = cache_str
+        os.environ["HF_HOME"] = str(hf_home)
+        os.environ["HF_XET_CACHE"] = str(xet_cache)
         hf_constants.HF_HUB_CACHE = cache_str
         hf_constants.HUGGINGFACE_HUB_CACHE = cache_str
+        if hasattr(hf_constants, "HF_HOME"):
+            hf_constants.HF_HOME = str(hf_home)
     except Exception:
         # huggingface_hub may not be imported yet; env vars are still set above.
         pass
@@ -35,11 +42,17 @@ def set_models_cache_dir(path: str | Path) -> Path:
     """Set and create the HuggingFace cache directory used by all engines."""
     cache_dir = Path(path).expanduser().resolve()
     cache_dir.mkdir(parents=True, exist_ok=True)
+    hf_home = cache_dir.parent
+    xet_cache = hf_home / "xet"
+    hf_home.mkdir(parents=True, exist_ok=True)
+    xet_cache.mkdir(parents=True, exist_ok=True)
 
     cache_str = str(cache_dir)
     os.environ["HF_HUB_CACHE"] = cache_str
     os.environ["HUGGINGFACE_HUB_CACHE"] = cache_str
     os.environ["TRANSFORMERS_CACHE"] = cache_str
+    os.environ["HF_HOME"] = str(hf_home)
+    os.environ["HF_XET_CACHE"] = str(xet_cache)
     _sync_hf_constants(cache_dir)
     logger.info("Model cache directory set to: %s", cache_dir)
     return cache_dir
