@@ -26,7 +26,6 @@ def _sync_hf_constants(cache_dir: Path) -> None:
 
         os.environ["HF_HUB_CACHE"] = cache_str
         os.environ["HUGGINGFACE_HUB_CACHE"] = cache_str
-        os.environ["TRANSFORMERS_CACHE"] = cache_str
         os.environ["HF_HOME"] = str(hf_home)
         os.environ["HF_XET_CACHE"] = str(xet_cache)
         hf_constants.HF_HUB_CACHE = cache_str
@@ -50,7 +49,6 @@ def set_models_cache_dir(path: str | Path) -> Path:
     cache_str = str(cache_dir)
     os.environ["HF_HUB_CACHE"] = cache_str
     os.environ["HUGGINGFACE_HUB_CACHE"] = cache_str
-    os.environ["TRANSFORMERS_CACHE"] = cache_str
     os.environ["HF_HOME"] = str(hf_home)
     os.environ["HF_XET_CACHE"] = str(xet_cache)
     _sync_hf_constants(cache_dir)
